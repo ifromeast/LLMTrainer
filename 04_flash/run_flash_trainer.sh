@@ -1,8 +1,8 @@
 
-torchrun --nnodes 1 --nproc_per_node 8 pretrain_hf.py \
+torchrun --nnodes 1 --nproc_per_node 8 ../01_base_hf/pretrain_hf.py \
     --model_config_path /root/alpaca_test/LLMTrainer/config/config.json \
     --tokenizer_name_or_path /root/alpaca_test/LLMTrainer/ckpt/Llama-2-13b-hf \
-    --per_device_train_batch_size 8 \
+    --per_device_train_batch_size 16 \
     --do_train \
     --flash_attn \
     --seed 1234 \
