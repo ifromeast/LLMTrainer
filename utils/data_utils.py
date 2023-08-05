@@ -4,7 +4,7 @@ from typing import List, Dict, Any, Mapping
 import torch
 import numpy as np
 import logging
-from datasets import load_dataset
+from datasets import load_dataset, load_from_disk
 
 logger = logging.getLogger(__name__)
 
@@ -31,34 +31,30 @@ def group_texts(examples, block_size):
 
 
 def get_dataset(tokenizer, model_max_length, cache_dir):
-    try:
-        lm_datasets = datasets.load_from_disk(cache_dir, keep_in_memory=False)
-    except:
-        raw_dataset = load_dataset("wikipedia", "20220301.simple", split='train', cache_dir=cache_dir, keep_in_memory=False)
-        logger.info("dataset has been loaded!")
-        tokenized_dataset = raw_dataset.map(
-            tokenize_function,
-            batched=True,
-            num_proc=64,
-            remove_columns=raw_dataset.column_names,
-            load_from_cache_file=True,
-            keep_in_memory=False,
-            fn_kwargs={"tokenizer":tokenizer},
-            desc="Running tokenizer on dataset",
-        )
-        grouped_datasets = tokenized_dataset.map(
-            group_texts,
-            batched=True,
-            num_proc=64,
-            load_from_cache_file=True,
-            keep_in_memory=False,
-            fn_kwargs={'block_size':model_max_length},
-            desc=f"Grouping texts in chunks of {model_max_length}",
-        )
-        processed_dataset = grouped_datasets
-        
-        lm_datasets = processed_dataset.train_test_split(test_size = 0.01)
-        lm_datasets.save_to_disk(cache_dir)
+    raw_dataset = load_dataset("wikipedia", "20220301.simple", split='train', cache_dir=cache_dir, keep_in_memory=False)
+    logger.info("dataset has been loaded!")
+    tokenized_dataset = raw_dataset.map(
+        tokenize_function,
+        batched=True,
+        num_proc=8,
+        remove_columns=raw_dataset.column_names,
+        load_from_cache_file=True,
+        keep_in_memory=False,
+        fn_kwargs={"tokenizer":tokenizer},
+        desc="Running tokenizer on dataset",
+    )
+    grouped_datasets = tokenized_dataset.map(
+        group_texts,
+        batched=True,
+        num_proc=8,
+        load_from_cache_file=True,
+        keep_in_memory=False,
+        fn_kwargs={'block_size':model_max_length},
+        desc=f"Grouping texts in chunks of {model_max_length}",
+    )
+    processed_dataset = grouped_datasets
+    
+    lm_datasets = processed_dataset.train_test_split(test_size = 0.01)
     # lm_datasets = lm_datasets['train']
     return lm_datasets
 

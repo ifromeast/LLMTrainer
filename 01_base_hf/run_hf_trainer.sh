@@ -2,7 +2,7 @@
 torchrun --nnodes 1 --nproc_per_node 8 pretrain_hf.py \
     --model_config_path /root/alpaca_test/LLMTrainer/config/config.json \
     --tokenizer_name_or_path /root/alpaca_test/LLMTrainer/ckpt/Llama-2-13b-hf \
-    --per_device_train_batch_size 4 \
+    --per_device_train_batch_size 8 \
     --do_train \
     --seed 1234 \
     --fp16 \
@@ -12,7 +12,7 @@ torchrun --nnodes 1 --nproc_per_node 8 pretrain_hf.py \
     --warmup_ratio 0.05 \
     --weight_decay 0.01 \
     --logging_strategy steps \
-    --logging_steps 10 \
+    --logging_steps 1 \
     --save_strategy steps \
     --save_total_limit 1 \
     --save_steps 100 \

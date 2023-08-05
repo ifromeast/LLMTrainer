@@ -35,16 +35,22 @@ class DataArguments:
 class TrainingArguments(transformers.TrainingArguments):
     """Arguments for the training loop."""
     cache_dir: Optional[str] = field(default='/root/alpaca_test/cache_dir')
-
+    optim: str = field(default="adamw_torch")
     model_max_length: int = field(
         default=2048,
         metadata={'help': 'Maximum sequence length. Sequences will be right padded (and possibly truncated).',},)
+    flash_attn : Optional[bool] = field(default=False)
+
 
 
 def main() -> None:
     """Main training routine."""
     parser = transformers.HfArgumentParser([TrainingArguments, ModelArguments, DataArguments])
     training_args, model_args, data_args = parser.parse_args_into_dataclasses()
+    if training_args.flash_attn:
+        from utils.flash_attn_patch import replace_llama_attn_with_flash_attn
+        replace_llama_attn_with_flash_attn()
+
 
     tokenizer = tokenizer = AutoTokenizer.from_pretrained(model_args.tokenizer_name_or_path)
     train_dataset = get_dataset(tokenizer, training_args.model_max_length, training_args.cache_dir)
