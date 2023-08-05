@@ -52,7 +52,7 @@ def main() -> None:
         replace_llama_attn_with_flash_attn()
 
 
-    tokenizer = tokenizer = AutoTokenizer.from_pretrained(model_args.tokenizer_name_or_path)
+    tokenizer = AutoTokenizer.from_pretrained(model_args.tokenizer_name_or_path)
     train_dataset = get_dataset(tokenizer, training_args.model_max_length, training_args.cache_dir)
 
     config = AutoConfig.from_pretrained(model_args.model_config_path)

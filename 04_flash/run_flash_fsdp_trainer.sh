@@ -18,8 +18,10 @@ torchrun --nnodes 1 --nproc_per_node 8 ../01_base_hf/pretrain_hf.py \
     --save_total_limit 1 \
     --save_steps 100 \
     --gradient_accumulation_steps 8 \
+    --fsdp "full_shard auto_wrap" \
+    --fsdp_config '../02_fsdp/fsdp.json' \
     --model_max_length 2048 \
-    --output_dir './flash_logs' \
+    --output_dir './flash_fsdp_logs' \
     --overwrite_output_dir \
     --gradient_checkpointing \
     --ddp_find_unused_parameters False

@@ -1,0 +1,11 @@
+python pretrain_colossalai.py \
+    --config /root/alpaca_test/LLMTrainer/config/config.json \
+    --plugin gemini \
+    --batch_size 2 \
+    --lr 2e-5 \
+    --weigth_decay 0.01 \
+    --warmup_steps 2 \
+    --grad_checkpoint \
+    --max_length 2048 \
+    --mixed_precision fp16 \
+    --flash_attention

@@ -4,6 +4,7 @@ torchrun --nnodes 1 --nproc_per_node 8 ../01_base_hf/pretrain_hf.py \
     --tokenizer_name_or_path /root/alpaca_test/LLMTrainer/ckpt/Llama-2-13b-hf \
     --per_device_train_batch_size 16 \
     --do_train \
+    --deepspeed '../03_deepspeed/ds_zero2_no_offload.json' \
     --flash_attn \
     --seed 1234 \
     --fp16 \
@@ -19,7 +20,7 @@ torchrun --nnodes 1 --nproc_per_node 8 ../01_base_hf/pretrain_hf.py \
     --save_steps 100 \
     --gradient_accumulation_steps 8 \
     --model_max_length 2048 \
-    --output_dir './flash_logs' \
+    --output_dir './flash_ds_logs' \
     --overwrite_output_dir \
     --gradient_checkpointing \
     --ddp_find_unused_parameters False
