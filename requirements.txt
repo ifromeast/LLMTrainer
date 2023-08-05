@@ -1,0 +1,6 @@
+torch==2.0.1
+transformers==4.31.0
+deepspeed==0.10.0
+datasets==2.13.1
+colossalai
+xformers==0.0.20
