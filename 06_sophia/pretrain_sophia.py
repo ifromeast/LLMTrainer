@@ -1,56 +1,98 @@
 
-from transformers import AutoConfig, AutoTokenizer, AutoModelForCausalLM
-from transformers import Trainer, TrainingArguments
-# from Sophia.decoupled_sophia.decoupled_sophia import DecoupledSophia, HutchinsonEstimator
+import argparse
+import logging
+import math 
+from dataclasses import dataclass, field
+from typing import List, Optional, Tuple, Dict, Any
+
+import transformers
+from transformers import Trainer
+from transformers import AutoTokenizer, AutoConfig, AutoModelForCausalLM
 from sophia import SophiaG, DecoupledSophia
-from transformers import AutoTokenizer
 from utils.data_utils import get_dataset, fault_tolerance_data_collator
 
-
-tokenizer = AutoTokenizer.from_pretrained('/root/alpaca_test/LLMTrainer/ckpt/Llama-2-13b-hf')
-train_ds = get_dataset(tokenizer, model_max_length=2048, cache_dir='/root/alpaca_test/cache_dir')['train']
-
-# Initialize the GPT-2 model and tokenizer
-config = AutoConfig.from_pretrained('/root/alpaca_test/LLMTrainer/config/config.json')
-model = AutoModelForCausalLM.from_config(config)
+logger = logging.getLogger(__name__)
 
 
-# Initialize the DecoupledSophia optimizer
-optimizer = SophiaG(model.parameters(), lr=2e-5, betas=(0.9, 0.999), rho = 0.04, weight_decay=0.0)
-# DecoupledSophia(model.parameters(), lr=1e-3, betas=(0.9, 0.999), rho=0.04, weight_decay=1e-1, k=10, estimator="Hutchinson")
+@dataclass
+class ModelArguments:
+    """Arguments for models."""
+    model_config_path: Optional[str] = field(
+        default=None,
+        metadata={"help": ("The model name or config path")}, )
+    tokenizer_name_or_path: Optional[str] = field(
+        default=None,
+        metadata={"help": ("The tokenizer name or path")}, )
 
-# Set up the training arguments
-training_args = TrainingArguments(
-    output_dir="output_sophia",
-    overwrite_output_dir=True,
-    num_train_epochs=1,
-    bf16=True,
-    per_device_train_batch_size=2,
-    save_strategy="steps",
-    save_steps=1000,
-    save_total_limit=1,
-    logging_strategy="steps",
-    logging_steps=1,
-    gradient_accumulation_steps=8,
-    gradient_checkpointing=True,
-    learning_rate=2e-5,
-    lr_scheduler_type="cosine",
-    # optim="adamw_torch",
-    warmup_steps=2,
-)
+@dataclass
+class DataArguments:
+    """Arguments for datasets."""
+    datasets: List[str] = field(
+        default=None,
+        metadata={'help': 'Path to the local training data.'}, )
 
-# Create the Trainer
-trainer = Trainer(
-    model=model,
-    args=training_args,
-    data_collator=fault_tolerance_data_collator,
-    train_dataset=train_ds,
-    optimizers=(optimizer, None),
-)
+@dataclass
+class TrainingArguments(transformers.TrainingArguments):
+    """Arguments for the training loop."""
+    cache_dir: Optional[str] = field(default='/root/alpaca_test/cache_dir')
+    # optim: str = field(default="adamw_torch")
+    model_max_length: int = field(
+        default=2048,
+        metadata={'help': 'Maximum sequence length. Sequences will be right padded (and possibly truncated).',},)
+    flash_attn : Optional[bool] = field(default=False)
+    enable_sophia : Optional[bool] = field(default=False)
 
-# Train the model
-trainer.train()
 
-# Evaluate the model
-# eval_results = trainer.evaluate()
-# print(f"Perplexity: {torch.exp(torch.tensor(eval_results['eval_loss']))}")
+
+def main() -> None:
+    """Main training routine."""
+    parser = transformers.HfArgumentParser([TrainingArguments, ModelArguments, DataArguments])
+    training_args, model_args, data_args = parser.parse_args_into_dataclasses()
+    if training_args.flash_attn:
+        from utils.flash_attn_patch import replace_llama_attn_with_flash_attn
+        replace_llama_attn_with_flash_attn()
+
+    tokenizer = AutoTokenizer.from_pretrained(model_args.tokenizer_name_or_path)
+    train_dataset = get_dataset(tokenizer, training_args.model_max_length, training_args.cache_dir)
+
+    config = AutoConfig.from_pretrained(model_args.model_config_path)
+    model = AutoModelForCausalLM.from_config(config)
+    n_params = sum({p.data_ptr(): p.numel() for p in model.parameters()}.values())
+    logger.info(f"Training new model from scratch - Total size={n_params/2**20:.2f}M params")
+    
+    # Initialize our Trainer
+    if training_args.enable_sophia:
+        print("Using sophia optimizer...")
+        optimizer = SophiaG(model.parameters(), lr=2e-5, betas=(0.9, 0.999), rho = 0.04, weight_decay=0.0)
+        trainer = Trainer(
+            model=model,
+            args=training_args,
+            train_dataset=train_dataset['train'] if training_args.do_train else None,
+            tokenizer=tokenizer,
+            data_collator=fault_tolerance_data_collator,
+            optimizers=(optimizer, None),
+        )
+    else:
+        trainer = Trainer(
+            model=model,
+            args=training_args,
+            train_dataset=train_dataset['train'] if training_args.do_train else None,
+            tokenizer=tokenizer,
+            data_collator=fault_tolerance_data_collator,
+        )
+
+     # Training
+    if training_args.do_train:
+        train_result = trainer.train()
+
+        metrics = train_result.metrics
+        trainer.log_metrics("train", metrics)
+        trainer.save_metrics("train", metrics)
+        trainer.save_state()
+        trainer.save_model()
+
+
+
+if __name__ == '__main__':
+    main()
+
