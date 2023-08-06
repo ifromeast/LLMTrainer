@@ -16,18 +16,18 @@ model = AutoModelForCausalLM.from_config(config)
 
 
 # Initialize the DecoupledSophia optimizer
-optimizer = SophiaG(model.parameters(), lr=2e-4, betas=(0.965, 0.99), rho = 0.01, weight_decay=1e-1)
+optimizer = SophiaG(model.parameters(), lr=2e-5, betas=(0.9, 0.999), rho = 0.04, weight_decay=0.0)
 # DecoupledSophia(model.parameters(), lr=1e-3, betas=(0.9, 0.999), rho=0.04, weight_decay=1e-1, k=10, estimator="Hutchinson")
 
 # Set up the training arguments
 training_args = TrainingArguments(
-    output_dir="output",
+    output_dir="output_sophia",
     overwrite_output_dir=True,
     num_train_epochs=1,
-    fp16=True,
+    bf16=True,
     per_device_train_batch_size=2,
     save_strategy="steps",
-    save_steps=100,
+    save_steps=1000,
     save_total_limit=1,
     logging_strategy="steps",
     logging_steps=1,
@@ -35,6 +35,7 @@ training_args = TrainingArguments(
     gradient_checkpointing=True,
     learning_rate=2e-5,
     lr_scheduler_type="cosine",
+    # optim="adamw_torch",
     warmup_steps=2,
 )
 
