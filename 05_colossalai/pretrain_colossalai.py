@@ -171,10 +171,10 @@ def main():
     # Initialize Tokenizer, Dataset and Dataloader
     # ==============================
     tokenizer = AutoTokenizer.from_pretrained('/root/alpaca_test/LLMTrainer/ckpt/Llama-2-13b-hf')
+    tokenizer.pad_token = tokenizer.unk_token
 
-    dataset = load_dataset("wikipedia", "20220301.simple", split='train', 
+    train_ds = load_dataset("wikipedia", "20220301.simple", split='train', 
                            cache_dir='/root/alpaca_test/cache_dir', keep_in_memory=False)
-    train_ds = dataset['train']
     dataloader = prepare_dataloader(train_ds,
                                     batch_size=args.batch_size,
                                     shuffle=True,
@@ -188,8 +188,8 @@ def main():
     init_ctx = LazyInitContext(
         default_device=get_current_device()) if isinstance(plugin, GeminiPlugin) else nullcontext()
 
-    with init_ctx:
-        model = LlamaForCausalLM(config)
+    # with init_ctx:
+    model = AutoModelForCausalLM.from_config(config)
 
     if args.grad_checkpoint:
         model.gradient_checkpointing_enable()

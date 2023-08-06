@@ -1,7 +1,7 @@
-python pretrain_colossalai.py \
+colossalai run --nproc_per_node 8 pretrain_colossalai.py \
     --config /root/alpaca_test/LLMTrainer/config/config.json \
-    --plugin gemini \
-    --batch_size 2 \
+    --plugin gemini_cuda \
+    --batch_size 28 \
     --lr 2e-5 \
     --weigth_decay 0.01 \
     --warmup_steps 2 \
