@@ -1,5 +1,6 @@
 import argparse
 import os
+import json
 import resource
 from contextlib import nullcontext
 from functools import partial
@@ -9,16 +10,15 @@ import torch
 import torch.distributed as dist
 import torch.nn as nn
 from attn import SUPPORT_XFORMERS, replace_xformers
-from data_utils import load_json, prepare_dataloader, save_json
-from datasets import load_dataset
+from torch.utils.data import DataLoader
+from torch.utils.data.distributed import DistributedSampler
+from utils.data_utils import get_dataset, fault_tolerance_data_collator
 from torch.optim import Optimizer
 from torch.optim.lr_scheduler import _LRScheduler
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 from transformers import AutoTokenizer, AutoConfig, AutoModelForCausalLM
-from transformers import LlamaConfig, LlamaForCausalLM, LlamaTokenizer
-# from transformers.models.llama.modeling_llama import LlamaForCausalLM
-# from transformers.models.llama.tokenization_llama import LlamaTokenizer
+from transformers import LlamaTokenizer
 
 import colossalai
 from colossalai.booster import Booster
@@ -28,6 +28,16 @@ from colossalai.lazy import LazyInitContext
 from colossalai.nn.lr_scheduler import CosineAnnealingWarmupLR
 from colossalai.nn.optimizer import HybridAdam
 from colossalai.utils import get_current_device
+
+
+def load_json(file_path: str):
+    with open(file_path, 'r') as f:
+        return json.load(f)
+
+
+def save_json(data, file_path: str):
+    with open(file_path, 'w') as f:
+        json.dump(data, f, indent=4)
 
 
 def get_model_numel(model: nn.Module) -> int:
@@ -173,13 +183,14 @@ def main():
     tokenizer = AutoTokenizer.from_pretrained('/root/alpaca_test/LLMTrainer/ckpt/Llama-2-13b-hf')
     tokenizer.pad_token = tokenizer.unk_token
 
-    train_ds = load_dataset("wikipedia", "20220301.simple", split='train', 
-                           cache_dir='/root/alpaca_test/cache_dir', keep_in_memory=False)
-    dataloader = prepare_dataloader(train_ds,
-                                    batch_size=args.batch_size,
-                                    shuffle=True,
-                                    drop_last=True,
-                                    collate_fn=partial(tokenize_batch, tokenizer=tokenizer, max_length=args.max_length))
+    train_ds = get_dataset(tokenizer, args.max_length, '/root/alpaca_test/cache_dir')['train']
+    sampler = DistributedSampler(train_ds)
+    dataloader = DataLoader(train_ds,
+                            batch_size=args.batch_size,
+                            sampler=sampler,
+                            collate_fn=fault_tolerance_data_collator,
+                            drop_last=True,
+                            num_workers=8,)
 
     # ==============================
     # Initialize Model, Optimizer and LR Scheduler
@@ -214,28 +225,19 @@ def main():
     torch.set_default_dtype(torch.float)
 
     coordinator.print_on_master(f'Booster init max CUDA memory: {torch.cuda.max_memory_allocated()/1024**2:.2f} MB')
-    coordinator.print_on_master(
-        f'Booster init max CPU memory: {resource.getrusage(resource.RUSAGE_SELF).ru_maxrss/1024:.2f} MB')
+    coordinator.print_on_master(f'Booster init max CPU memory: {resource.getrusage(resource.RUSAGE_SELF).ru_maxrss/1024:.2f} MB')
 
     # load checkpoint if specified
     start_epoch = 0
     start_step = 0
-    sampler_start_idx = 0
     if args.load is not None:
         coordinator.print_on_master('Loading checkpoint')
         start_epoch, start_step, sampler_start_idx = load(booster, model, optimizer, lr_scheduler, args.load)
         coordinator.print_on_master(f'Loaded checkpoint {args.load} at epoch {start_epoch} step {start_step}')
 
     num_steps_per_epoch = len(dataloader)
-    # if resume training, set the sampler start index to the correct value
-    dataloader.sampler.set_start_index(sampler_start_idx)
     for epoch in range(start_epoch, args.num_epochs):
-        dataloader.sampler.set_epoch(epoch)
-        with tqdm(enumerate(dataloader),
-                  desc=f'Epoch {epoch}',
-                  disable=not coordinator.is_master(),
-                  total=num_steps_per_epoch,
-                  initial=start_step) as pbar:
+        with tqdm(enumerate(dataloader), desc=f'Epoch {epoch}', disable=not coordinator.is_master(), total=num_steps_per_epoch, initial=start_step) as pbar:
             for step, batch in pbar:
                 batch = {k: v.cuda() for k, v in batch.items()}
                 outputs = model(**batch)
@@ -255,8 +257,6 @@ def main():
                     save(booster, model, optimizer, lr_scheduler, epoch, step + 1, args.batch_size, coordinator,
                          args.save_dir)
                     coordinator.print_on_master(f'Saved checkpoint at epoch {epoch} step {step + 1}')
-        # the continue epochs are not resumed, so we need to reset the sampler start index and start step
-        dataloader.sampler.set_start_index(0)
         start_step = 0
 
     coordinator.print_on_master(f'Max CUDA memory usage: {torch.cuda.max_memory_allocated()/1024**2:.2f} MB')

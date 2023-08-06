@@ -1,4 +1,4 @@
-colossalai run --nproc_per_node 8 pretrain_colossalai.py \
+torchrun --nnodes 1 --nproc_per_node 8 pretrain_colossalai.py \
     --config /root/alpaca_test/LLMTrainer/config/config.json \
     --plugin gemini_cuda \
     --batch_size 28 \

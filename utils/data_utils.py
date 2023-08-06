@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 
 
 def tokenize_function(examples, tokenizer):
-    return tokenizer(examples['text'])
+    return tokenizer(examples['text'], return_tensors="pt")
    
 # Main data processing function that will concatenate all texts from our dataset and generate chunks of block_size.
 def group_texts(examples, block_size):
