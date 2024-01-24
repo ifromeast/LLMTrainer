@@ -1,11 +1,20 @@
-# LLMTrainer
-对比 LLM 的多种预训练方案的性能，方案包括：
-- Torch DDP
-- FSDP
-- DeepSpeed
-- FlashAttention V2
-- ColossalAI
-- Sophia Optimizer
-- Lightning Fabric 
 
-详细介绍见 https://zhuanlan.zhihu.com/p/648094197?
+RLHF solution for Baichuan 2
+
+```
+# run sft
+sh scripts/train_sft_baichuan2.sh
+
+# run rm
+sh scripts/train_rm_baichuan2.sh
+
+
+# run ppo by ray
+# launch ray
+ray start --head --node-ip-address 0.0.0.0 --num-gpus 8 --dashboard-host 10.59.144.213 --dashboard-port 8090
+
+# train ray PPO model (8 gpus)
+sh scripts/train_ppo_baichuan2.sh
+
+```
+
