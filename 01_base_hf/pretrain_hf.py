@@ -34,7 +34,7 @@ class DataArguments:
 @dataclass
 class TrainingArguments(transformers.TrainingArguments):
     """Arguments for the training loop."""
-    cache_dir: Optional[str] = field(default='/root/alpaca_test/cache_dir')
+    cache_dir: Optional[str] = field(default='/data/zzd/cache_dir')
     optim: str = field(default="adamw_torch")
     model_max_length: int = field(
         default=2048,
@@ -53,6 +53,7 @@ def main() -> None:
 
 
     tokenizer = AutoTokenizer.from_pretrained(model_args.tokenizer_name_or_path)
+    tokenizer.pad_token = tokenizer.eos_token
     train_dataset = get_dataset(tokenizer, training_args.model_max_length, training_args.cache_dir)
 
     config = AutoConfig.from_pretrained(model_args.model_config_path)

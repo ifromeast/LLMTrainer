@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 
 
 def tokenize_function(examples, tokenizer):
-    return tokenizer(examples['text'], return_tensors="pt")
+    return tokenizer(examples['text'], return_tensors="pt", padding=True, truncation=True)
    
 # Main data processing function that will concatenate all texts from our dataset and generate chunks of block_size.
 def group_texts(examples, block_size):
@@ -31,7 +31,7 @@ def group_texts(examples, block_size):
 
 
 def get_dataset(tokenizer, model_max_length, cache_dir):
-    raw_dataset = load_dataset("wikipedia", "20220301.simple", split='train', cache_dir=cache_dir, keep_in_memory=False)
+    raw_dataset = load_dataset("wikimedia/wikipedia", "20231101.en", split='train', cache_dir=cache_dir, keep_in_memory=False).select(range(10000))
     logger.info("dataset has been loaded!")
     tokenized_dataset = raw_dataset.map(
         tokenize_function,

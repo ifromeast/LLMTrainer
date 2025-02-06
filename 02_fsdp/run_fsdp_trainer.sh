@@ -1,8 +1,8 @@
 
-torchrun --nnodes 1 --nproc_per_node 8 ../01_base_hf/pretrain_hf.py \
-    --model_config_path /root/alpaca_test/LLMTrainer/config/config.json \
-    --tokenizer_name_or_path /root/alpaca_test/LLMTrainer/ckpt/Llama-2-13b-hf \
-    --per_device_train_batch_size 12 \
+torchrun --nnodes 1 --nproc_per_node 8 ./01_base_hf/pretrain_hf.py \
+    --model_config_path /data0/ckpt/LLM-Research/Llama-3.2-3B-Instruct/config.json \
+    --tokenizer_name_or_path /data0/ckpt/LLM-Research/Llama-3.2-3B-Instruct \
+    --per_device_train_batch_size 2 \
     --do_train \
     --seed 1234 \
     --fp16 \
@@ -19,7 +19,7 @@ torchrun --nnodes 1 --nproc_per_node 8 ../01_base_hf/pretrain_hf.py \
     --gradient_accumulation_steps 8 \
     --model_max_length 2048 \
     --fsdp "full_shard auto_wrap" \
-    --fsdp_config './fsdp.json' \
+    --fsdp_config './02_fsdp/fsdp.json' \
     --output_dir './fsdp_logs' \
     --overwrite_output_dir \
     --gradient_checkpointing \
